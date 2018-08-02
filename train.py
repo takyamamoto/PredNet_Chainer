@@ -75,11 +75,6 @@ def main():
     trainer.extend(extensions.LogReport(trigger=(10, 'iteration')))
 
     # Schedule of a learning rate (LinearShift)
-    fifty = int(args.epoch * 0.5 * num_train_samples / args.batch)
-    seventyfive = int(args.epoch * 0.75 * num_train_samples / args.batch)
-    trainer.extend(extensions.LinearShift("lr", (args.lr, args.lr*0.1), (fifty,fifty+args.batch)))
-    trainer.extend(extensions.LinearShift("lr", (args.lr*0.1, args.lr*0.01), (seventyfive,seventyfive+args.batch)))
-
 
     # Save two plot images to the result dir
     if args.plot and extensions.PlotReport.available():
