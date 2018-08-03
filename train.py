@@ -7,58 +7,50 @@ Created on Sat Jul 21 08:51:18 2018
 
 import argparse
 
+import numpy as np
 import chainer
 from chainer import training
-from chainer.training import extensions
+from chainer.training import extensions, triggers
 from chainer import iterators, optimizers, serializers
-from chainer import cuda
-import chainer.links as L
-from chainer.datasets import get_cifar10
-from chainer.datasets import get_cifar100
+#from chainer import cuda
 
 import network
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', '-g', type=int, default=-1)
-    parser.add_argument('--dataset', '-d', default='cifar10',
-                        help='The dataset to use: cifar10 or cifar100')
     parser.add_argument('--model', '-m', type=str, default=None)
     parser.add_argument('--opt', type=str, default=None)
-    parser.add_argument('--epoch', '-e', type=int, default=40)
-    parser.add_argument('--looptimes', '-t', type=int, default=5)
-    parser.add_argument('--lr', '-l', type=float, default=0.01)
-    parser.add_argument('--batch', '-b', type=int, default=128)
+    parser.add_argument('--epoch', '-e', type=int, default=30)
+    parser.add_argument('--lr', '-l', type=float, default=0.001)
+    parser.add_argument('--batch', '-b', type=int, default=10)
     parser.add_argument('--noplot', dest='plot', action='store_false',
                         help='Disable PlotReport extension')
     args = parser.parse_args()
 
-    if args.dataset == 'cifar10':
-        print('Using CIFAR10 dataset.')
-        class_labels = 10
-        train, test = get_cifar10()
-    elif args.dataset == 'cifar100':
-        print('Using CIFAR100 dataset.')
-        class_labels = 100
-        train, test = get_cifar100()
-    else:
-        raise RuntimeError('Invalid dataset choice.')
-
+    data = np.load("mnist_test_seq.npy")
+    data = np.reshape(data, (10000, 20, 1, 64, 64))
+    data = data / 255
+    data = data.astype(np.int32)
+    
+    train = data[:9000]
+    validation = data[9000:9500]
+    #test = data[9500:]
+    
     # Set up a neural network to train.
-    model = L.Classifier(network.LocalPCN(class_labels=class_labels, LoopTimes=args.looptimes))
+    model = network.PredNet()
 
     if args.gpu >= 0:
         # Make a specified GPU current
         chainer.backends.cuda.get_device_from_id(args.gpu).use()
         model.to_gpu()  # Copy the model to the GPU
 
-    optimizer = optimizers.NesterovAG(lr=args.lr, momentum=0.9)
+    optimizer = optimizers.Adam(alpha=args.lr)
     optimizer.setup(model)
     optimizer.add_hook(chainer.optimizer_hooks.WeightDecay(1e-4))
 
-    num_train_samples = 45000
-    train_iter = iterators.SerialIterator(train[:num_train_samples], batch_size=args.batch, shuffle=True)
-    test_iter = iterators.SerialIterator(train[num_train_samples:], batch_size=args.batch, repeat=False, shuffle=False)
+    train_iter = iterators.SerialIterator(train, batch_size=args.batch, shuffle=True)
+    test_iter = iterators.SerialIterator(validation, batch_size=args.batch, repeat=False, shuffle=False)
 
     if args.model != None:
         print( "loading model from " + args.model )
@@ -74,7 +66,14 @@ def main():
     trainer.extend(extensions.Evaluator(test_iter, model, device=args.gpu))
     trainer.extend(extensions.LogReport(trigger=(10, 'iteration')))
 
-    # Schedule of a learning rate (LinearShift)
+    # Snapshot
+    trainer.extend(extensions.snapshot(), trigger=(10, 'epoch'))
+    #serializers.load_npz('./result/snapshot_iter_50000', trainer)
+    
+    # Decay learning rate
+    point = [args.epoch*0.5, args.epoch*0.75]
+    trainer.extend(extensions.ExponentialShift('alpha', 0.1), 
+                   trigger=triggers.ManualScheduleTrigger(point,'epoch'))
 
     # Save two plot images to the result dir
     if args.plot and extensions.PlotReport.available():
@@ -86,7 +85,9 @@ def main():
                 ['main/accuracy', 'validation/main/accuracy'],
                 'epoch', file_name='accuracy.png'))
 
-    trainer.extend(extensions.PrintReport(['epoch', 'main/loss', 'validation/main/loss','main/accuracy', 'validation/main/accuracy', 'elapsed_time']))
+    trainer.extend(extensions.PrintReport(['epoch', 'main/loss', 'validation/main/loss',
+                                           'main/accuracy', 'validation/main/accuracy',
+                                           'alpha']), trigger=(1, 'iteration'))
     trainer.extend(extensions.ProgressBar(update_interval=1))
 
     #Plot computation graph
@@ -104,5 +105,6 @@ def main():
     print( "saving optimizer to " + optimizername )
     serializers.save_npz(optimizername, optimizer)
 
-if __name__ == '__main__':
-    main()
+#if __name__ == '__main__':
+    #main()
+
