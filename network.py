@@ -11,6 +11,12 @@ import chainer.links as L
 from chainer import Variable
 from chainer import cuda
 
+import numpy as np
+from chainer import variable
+from chainer import reporter
+from chainer import initializers
+from chainer import Link, Chain
+
 xp = cuda.cupy
 
 # ConvLSTM from https://github.com/joisino/ConvLSTM/blob/master/network.py
@@ -58,8 +64,8 @@ class ConvLSTM(chainer.Chain):
         self.Wco.initialize((self.out_channels, shape[2], shape[3]))
 
     def initialize_state(self, shape):
-        self.pc = Variable(self.xp.zeros((shape[0], self.out_channels, shape[2], shape[3]), dtype = self.xp.float32))
-        self.ph = Variable(self.xp.zeros((shape[0], self.out_channels, shape[2], shape[3]), dtype = self.xp.float32))
+        self.pc = Variable(xp.zeros((shape[0], self.out_channels, shape[2], shape[3]), dtype = xp.float32))
+        self.ph = Variable(xp.zeros((shape[0], self.out_channels, shape[2], shape[3]), dtype = xp.float32))
 
     def __call__(self, x):
         if self.Wci.data is None:
@@ -90,7 +96,7 @@ class RepBlock(chainer.Chain):
     """
 
     def __init__(self, in_channels, out_channels):
-        super(Block, self).__init__()
+        super(RepBlock, self).__init__()
         with self.init_scope():
             """
             convlstm : representation Convolution lstm.
@@ -125,8 +131,8 @@ class ErrorBlock(chainer.Chain):
         pixel_max: the maximum pixel value. Used to clip the pixel-layer prediction.
     """
 
-    def __init__(self, t_in_channels, p_in_channels, out_channels, pixel_max=1, first_layer=False):
-        super(Block, self).__init__()
+    def __init__(self, t_in_channels, p_in_channels, out_channels, pixel_max=1.0, first_layer=False):
+        super(ErrorBlock, self).__init__()
         with self.init_scope():
             """
             tconv : target Convolution.
@@ -167,7 +173,7 @@ class ErrorBlock(chainer.Chain):
 # Build Predictive Coding Network
 class PredNet(chainer.Chain):
     def __init__(self, return_Ahat=False):
-        super(LocalPCN, self).__init__()
+        super(PredNet, self).__init__()
         with self.init_scope():
             self.R_block1 = RepBlock(34, 1)
             self.R_block2 = RepBlock(128, 32)
@@ -194,10 +200,10 @@ class PredNet(chainer.Chain):
 
         # Set initial states
         size = [int(xs[3]*((0.5)**(i))) for i in range(4)]
-        init_e1 = Variable(self.xp.zeros((xs[0], 2, size[0], size[0]), dtype=self.xp.float32))
-        init_e2 = Variable(self.xp.zeros((xs[0], 64, size[1], size[1]), dtype=self.xp.float32))
-        init_e3 = Variable(self.xp.zeros((xs[0], 128, size[2], size[2]), dtype=self.xp.float32))
-        init_e4 = Variable(self.xp.zeros((xs[0], 256, size[3], size[3]), dtype=self.xp.float32))
+        init_e1 = Variable(xp.zeros((xs[0], 2, size[0], size[0]), dtype=xp.float32))
+        init_e2 = Variable(xp.zeros((xs[0], 64, size[1], size[1]), dtype=xp.float32))
+        init_e3 = Variable(xp.zeros((xs[0], 128, size[2], size[2]), dtype=xp.float32))
+        init_e4 = Variable(xp.zeros((xs[0], 256, size[3], size[3]), dtype=xp.float32))
 
         e = [init_e1, init_e2, init_e3, init_e4]
         self.R_block1.reset_state()
@@ -216,16 +222,20 @@ class PredNet(chainer.Chain):
 
             # Update Ahat, A, E states
             e1, ahat1 = self.E_block1(x[:,t], r[0])
-            e2 = self.E_block1(e1, r[1])
-            e3 = self.E_block1(e2, r[2])
-            e4 = self.E_block1(e3, r[3])
+            e2 = self.E_block2(e1, r[1])
+            e3 = self.E_block3(e2, r[2])
+            e4 = self.E_block4(e3, r[3])
             e = [e1, e2, e3, e4]
 
             Ahat.append(ahat1)
 
             if t > 0:
-                loss_t = F.sum(e1)
-                loss = loss_t if loss is None else loss + loss_t
+                loss_t = F.sum(e1)/xs[0]
+            else:
+                loss_t = 0
+            loss = loss_t if loss is None else loss + loss_t
+
+        reporter.report({'loss': loss}, self)
 
         if self.return_Ahat == True:
             return Ahat, loss
