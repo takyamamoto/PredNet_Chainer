@@ -23,21 +23,23 @@ def main():
     parser.add_argument('--gpu', '-g', type=int, default=-1)
     parser.add_argument('--model', '-m', type=str, default=None)
     parser.add_argument('--opt', type=str, default=None)
-    parser.add_argument('--epoch', '-e', type=int, default=30)
+    parser.add_argument('--epoch', '-e', type=int, default=60)
     parser.add_argument('--lr', '-l', type=float, default=0.001)
-    parser.add_argument('--batch', '-b', type=int, default=10)
+    parser.add_argument('--batch', '-b', type=int, default=8)
     parser.add_argument('--noplot', dest='plot', action='store_false',
                         help='Disable PlotReport extension')
     args = parser.parse_args()
 
     print("Load data...")
     data = np.load("mnist_test_seq.npy")
-    data = np.reshape(data, (10000, 20, 1, 64, 64))
+    data = np.hstack((data[:10], data[10:]))
+    data = data.transpose((1, 0, 2, 3))
+    data = np.reshape(data, (20000, 10, 1, 64, 64))
     data = data / 255
-    data = data.astype(xp.int32)
+    data = data.astype(xp.float32)
 
-    train = data[:9000]
-    validation = data[9000:9500]
+    train = data[:18000]
+    validation = data[18000:19000]
     #test = data[9500:]
 
     # Set up a neural network to train.
@@ -75,12 +77,13 @@ def main():
 
     # Snapshot
     trainer.extend(extensions.snapshot(), trigger=(10, 'epoch'))
-    #serializers.load_npz('./result/snapshot_iter_50000', trainer)
+    #serializers.load_npz('./results/snapshot_iter_1407', trainer)
 
     # Decay learning rate
     points = [args.epoch*0.5, args.epoch*0.75]
-    trainer.extend(extensions.ExponentialShift('alpha', 0.1, optimizer=optimizer),
+    trainer.extend(extensions.ExponentialShift('alpha', 0.1),
                    trigger=triggers.ManualScheduleTrigger(points,'epoch'))
+
 
     # Save two plot images to the result dir
     if args.plot and extensions.PlotReport.available():
