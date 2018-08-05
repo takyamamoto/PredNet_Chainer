@@ -173,22 +173,43 @@ class ErrorBlock(chainer.Chain):
 
 # Build Predictive Coding Network
 class PredNet(chainer.Chain):
-    def __init__(self, return_Ahat=False):
+    def __init__(self, num_layers=5, stack_sizes=(1, 32, 64, 128, 256),
+                 return_Ahat=False):
+        """
+        Args:
+        """
         super(PredNet, self).__init__()
         with self.init_scope():
-            self.R_block1 = RepBlock(35, 1)
-            self.R_block2 = RepBlock(160, 32)
-            self.R_block3 = RepBlock(320, 64)
-            self.R_block4 = RepBlock(640, 128)
-            self.R_block5 = RepBlock(768, 256)
+            for l in range(num_layers):
+                if l != num_layers-1:
+                    setattr(self, "R_block"+str(l),
+                            RepBlock(stack_sizes[l]*3 + stack_sizes[l+1], stack_sizes[l]))
+                else:
+                    setattr(self, "R_block"+str(l),
+                            RepBlock(stack_sizes[l]*3, stack_sizes[l]))
 
-            self.E_block1 = ErrorBlock(1, first_layer=True)
-            self.E_block2 = ErrorBlock(32)
-            self.E_block3 = ErrorBlock(64)
-            self.E_block4 = ErrorBlock(128)
-            self.E_block5 = ErrorBlock(256)
+                if l == 0:
+                    setattr(self, "E_block"+str(l),
+                            ErrorBlock(stack_sizes[l], first_layer=True))
+                else:
+                    setattr(self, "E_block"+str(l), ErrorBlock(stack_sizes[l]))
 
+            self.num_layers = num_layers
+            self.stack_sizes = stack_sizes
             self.return_Ahat = return_Ahat
+
+    def reset_state(self, batch_size, im_height, im_width):
+        # Set initial states
+        h = [int(im_height*((0.5)**(i))) for i in range(self.num_layers)]
+        w = [int(im_width*((0.5)**(i))) for i in range(self.num_layers)]
+        e = [] # initial E
+        r = [] # initial R
+        for l in range(self.num_layers):
+            e.append(Variable(xp.zeros((batch_size, self.stack_sizes[l]*2, h[l], w[l]), dtype=xp.float32)))
+            r.append(Variable(xp.zeros((batch_size, self.stack_sizes[l], h[l], w[l]), dtype=xp.float32)))
+            getattr(self, "R_block"+str(l)).reset_state()
+
+        return e, r
 
     def __call__(self, x):
         """
@@ -200,55 +221,46 @@ class PredNet(chainer.Chain):
         loss = None
 
         # Set initial states
-        size = [int(xs[3]*((0.5)**(i))) for i in range(5)]
-        init_e1 = Variable(xp.zeros((xs[0], 2, size[0], size[0]), dtype=xp.float32))
-        init_e2 = Variable(xp.zeros((xs[0], 64, size[1], size[1]), dtype=xp.float32))
-        init_e3 = Variable(xp.zeros((xs[0], 128, size[2], size[2]), dtype=xp.float32))
-        init_e4 = Variable(xp.zeros((xs[0], 256, size[3], size[3]), dtype=xp.float32))
-        init_e5 = Variable(xp.zeros((xs[0], 512, size[4], size[4]), dtype=xp.float32))
+        e_init, r_init = self.reset_state(xs[0], xs[3], xs[4])
 
-        e = [init_e1, init_e2, init_e3, init_e4, init_e5]
-        self.R_block1.reset_state()
-        self.R_block2.reset_state()
-        self.R_block3.reset_state()
-        self.R_block4.reset_state()
-        self.R_block5.reset_state()
+        if self.return_Ahat == True:
+            Ahat = []
 
-        init_r1 = Variable(xp.zeros((xs[0], 1, size[0], size[0]), dtype=xp.float32))
-        init_r2 = Variable(xp.zeros((xs[0], 32, size[1], size[1]), dtype=xp.float32))
-        init_r3 = Variable(xp.zeros((xs[0], 64, size[2], size[2]), dtype=xp.float32))
-        init_r4 = Variable(xp.zeros((xs[0], 128, size[3], size[3]), dtype=xp.float32))
-        init_r5 = Variable(xp.zeros((xs[0], 256, size[4], size[4]), dtype=xp.float32))
-        r = [init_r1, init_r2, init_r3, init_r4, init_r5]
-
-        Ahat = []
+        e_t = [None]*self.num_layers
+        r_t = [None]*self.num_layers
 
         for t in range(T):
+            if t == 0:
+                e_tm1 = e_init # E(t minus 1)
+                r_tm1 = r_init # R(t minus 1)
+
             # Update R states
-            r5 = self.R_block5(e[4], r[4])
-            r4 = self.R_block4(e[3], r[3], r5)
-            r3 = self.R_block3(e[2], r[2], r4)
-            r2 = self.R_block2(e[1], r[1], r3)
-            r1 = self.R_block1(e[0], r[0], r2)
-            r = [r1, r2, r3, r4, r5]
+            for l in reversed(range(self.num_layers)):
+                if l == self.num_layers-1:
+                    r_t[l] = getattr(self, "R_block"+str(l))(e_tm1[l], r_tm1[l])
+                else:
+                    r_t[l] = getattr(self, "R_block"+str(l))(e_tm1[l], r_tm1[l], r_t[l+1])
 
             # Update Ahat, A, E states
-            e1, ahat1 = self.E_block1(x[:,t], r1)
-            e2 = self.E_block2(e1, r[1])
-            e3 = self.E_block3(e2, r[2])
-            e4 = self.E_block4(e3, r[3])
-            e5 = self.E_block5(e4, r[4])
-            e = [e1, e2, e3, e4, e5]
+            for l in range(self.num_layers):
+                if l == 0:
+                    e_t[l], frame_prediction = getattr(self, "E_block"+str(l))(x[:,t], r_t[l])
+                else:
+                    e_t[l] = getattr(self, "E_block"+str(l))(e_t[l-1], r_t[l])
 
             if self.return_Ahat == True:
-                Ahat.append(ahat1)
+                Ahat.append(frame_prediction)
 
             if t > 0:
                 #loss_t = (F.average(e1) + 0.1*F.average(e2) + 0.1*F.average(e3) + 0.1*F.average(e4) + 0.1*F.average(e5))/xs[0]
-                loss_t = (F.average(F.flatten(e1)))/xs[0]
+                loss_t = (F.average(F.flatten(e_t[0])))/xs[0]
             else:
                 loss_t = 0
             loss = loss_t if loss is None else loss + loss_t
+
+            # Update
+            e_tm1 = e_t
+            r_tm1 = r_t
 
         reporter.report({'loss': loss}, self)
 
