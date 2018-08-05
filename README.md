@@ -19,6 +19,10 @@ python train.py -g 0
 ```
 
 ## Results
+Run following command.
+```
+python generate_result_images.py -g 0
+```
 
 ### Testset 15th
 <img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/out.gif" width=50%>
