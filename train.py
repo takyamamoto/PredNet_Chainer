@@ -13,6 +13,7 @@ from chainer import training
 from chainer.training import extensions, triggers
 from chainer import iterators, optimizers, serializers
 from chainer import cuda
+#import matplotlib.pyplot as plt
 
 xp = cuda.cupy
 
@@ -23,27 +24,28 @@ def main():
     parser.add_argument('--gpu', '-g', type=int, default=-1)
     parser.add_argument('--model', '-m', type=str, default=None)
     parser.add_argument('--opt', type=str, default=None)
-    parser.add_argument('--epoch', '-e', type=int, default=60)
+    parser.add_argument('--epoch', '-e', type=int, default=40)
     parser.add_argument('--lr', '-l', type=float, default=0.001)
-    parser.add_argument('--batch', '-b', type=int, default=8)
+    parser.add_argument('--batch', '-b', type=int, default=4)
     parser.add_argument('--noplot', dest='plot', action='store_false',
                         help='Disable PlotReport extension')
     args = parser.parse_args()
 
-    print("Load data...")
+    print("Loading and preprocessing data")
     data = np.load("mnist_test_seq.npy")
-    data = np.hstack((data[:10], data[10:]))
     data = data.transpose((1, 0, 2, 3))
-    data = np.reshape(data, (20000, 10, 1, 64, 64))
+    data = np.reshape(data, (10000, 20, 1, 64, 64))
     data = data / 255
     data = data.astype(xp.float32)
 
-    train = data[:18000]
-    validation = data[18000:19000]
-    #test = data[9500:]
+    train = data[:9000]
+    validation = data[9000:9900]
+    #test = data[9900:]
+
+    #plt.imshow(train[0,0,0])
 
     # Set up a neural network to train.
-    print("Build model...")
+    print("Building model")
     model = network.PredNet()
 
     if args.gpu >= 0:
@@ -60,11 +62,11 @@ def main():
                                          repeat=False, shuffle=False)
 
     if args.model != None:
-        print( "loading model from " + args.model)
+        print( "Loading model from " + args.model)
         serializers.load_npz(args.model, model)
 
     if args.opt != None:
-        print( "loading opt from " + args.opt)
+        print( "Loading opt from " + args.opt)
         serializers.load_npz(args.opt, optimizer)
 
     updater = training.StandardUpdater(train_iter, optimizer, device=args.gpu)
@@ -80,7 +82,7 @@ def main():
     #serializers.load_npz('./results/snapshot_iter_1407', trainer)
 
     # Decay learning rate
-    points = [args.epoch*0.5, args.epoch*0.75]
+    points = [args.epoch*0.75]
     trainer.extend(extensions.ExponentialShift('alpha', 0.1),
                    trigger=triggers.ManualScheduleTrigger(points,'epoch'))
 
@@ -102,11 +104,11 @@ def main():
 
     # Save results
     modelname = "./results/model"
-    print( "saving model to " + modelname )
+    print( "Saving model to " + modelname )
     serializers.save_npz(modelname, model)
 
     optimizername = "./results/optimizer"
-    print( "saving optimizer to " + optimizername )
+    print( "Saving optimizer to " + optimizername )
     serializers.save_npz(optimizername, optimizer)
 
 if __name__ == '__main__':

@@ -31,21 +31,20 @@ def main():
     args = parser.parse_args()
 
     # Set up a neural network to train.
-    print("Load data...")
+    print("Loading data")
     data = np.load("mnist_test_seq.npy")
-    data = np.hstack((data[:10], data[10:]))
     data = data.transpose((1, 0, 2, 3))
-    data = np.reshape(data, (20000, 10, 1, 64, 64))
+    data = np.reshape(data, (10000, 20, 1, 64, 64))
     data = data / 255
-    data = data.astype(np.float32)
+    data = data.astype(xp.float32)
 
     #train = data[:18000]
     #validation = data[18000:19000]
-    test = data[19000:]
+    test = data[9900:]
     which = 20
 
     # Set up a neural network to train.
-    print("Build model...")
+    print("Building model")
     model = network.PredNet(return_Ahat=True)
     if args.model != None:
         print( "Loading model from " + args.model )
@@ -75,7 +74,7 @@ def main():
     ax2.set_title('Predicted')
 
     ims=[]
-    for time in range(10):
+    for time in range(20):
         title = fig.text(0.5, 0.85, "t = "+str(time), fontsize="large")
         im, = [ax1.imshow(x[time,0])]
 
