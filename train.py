@@ -8,15 +8,46 @@ Created on Sat Jul 21 08:51:18 2018
 import argparse
 
 import numpy as np
+import cv2
+import glob
+from tqdm import tqdm
+
 import chainer
 from chainer import training
 from chainer.training import extensions, triggers
 from chainer import iterators, optimizers, serializers
 from chainer import cuda
-
 xp = cuda.cupy
 
 import network
+
+def LoadData(image_dir="./Denis_Day1_001/", num_frames=20, validation_rate=0.8):
+    datalist = []
+    num_files = len(glob.glob(image_dir+"*"))
+    
+    count = num_files//num_frames
+    num_train = int(count*validation_rate)
+    
+    for i in tqdm(range(count)):
+        for j in range(num_frames):
+            img = cv2.imread(image_dir+'frames_{0:06d}.jpg'.format(i*num_frames+j))
+            img = xp.transpose(img, (2, 0, 1))
+            img = xp.expand_dims(img, axis=0)
+            if j == 0:
+                stack = img
+            else:
+                stack = np.concatenate((stack, img), axis=0)
+        stack = xp.expand_dims(stack, axis=0)
+        datalist.append(stack)
+    
+    data = np.zeros((count, num_frames, 3, 120, 160))
+    for i, partial_data in enumerate(tqdm(datalist)):
+        data[i] = partial_data
+    
+    data = data.astype(xp.float32)
+    data = data / 255
+    print(data.max())
+    return data[:num_train], data[num_train:]
 
 def main():
     parser = argparse.ArgumentParser()
@@ -30,21 +61,14 @@ def main():
                         help='Disable PlotReport extension')
     args = parser.parse_args()
 
-    print("Load data...")
-    data = np.load("mnist_test_seq.npy")
-    data = np.hstack((data[:10], data[10:]))
-    data = data.transpose((1, 0, 2, 3))
-    data = np.reshape(data, (20000, 10, 1, 64, 64))
-    data = data / 255
-    data = data.astype(xp.float32)
+    print("Loading data")
 
-    train = data[:18000]
-    validation = data[18000:19000]
+    train, validation = LoadData(image_dir="./Denis_Day1_001/")
     #test = data[9500:]
 
     # Set up a neural network to train.
     print("Build model...")
-    model = network.PredNet()
+    model = network.PredNet(stack_sizes=(3, 48, 96, 192))
 
     if args.gpu >= 0:
         # Make a specified GPU current
@@ -80,7 +104,7 @@ def main():
     #serializers.load_npz('./results/snapshot_iter_1407', trainer)
 
     # Decay learning rate
-    points = [args.epoch*0.5, args.epoch*0.75]
+    points = [args.epoch*0.75]
     trainer.extend(extensions.ExponentialShift('alpha', 0.1),
                    trigger=triggers.ManualScheduleTrigger(points,'epoch'))
 

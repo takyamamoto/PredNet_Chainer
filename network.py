@@ -11,11 +11,9 @@ import chainer.links as L
 from chainer import Variable
 from chainer import cuda
 
-import numpy as np
 from chainer import variable
 from chainer import reporter
 from chainer import initializers
-from chainer import Link, Chain
 
 xp = cuda.cupy
 
@@ -173,13 +171,14 @@ class ErrorBlock(chainer.Chain):
 
 # Build Predictive Coding Network
 class PredNet(chainer.Chain):
-    def __init__(self, num_layers=5, stack_sizes=(1, 32, 64, 128, 256),
-                 return_Ahat=False):
+    def __init__(self, stack_sizes=(3, 48, 96, 192), return_Ahat=False,
+                 prediction_length=0):
         """
         Args:
         """
         super(PredNet, self).__init__()
         with self.init_scope():
+            num_layers = len(stack_sizes)
             for l in range(num_layers):
                 if l != num_layers-1:
                     setattr(self, "R_block"+str(l),
@@ -197,6 +196,10 @@ class PredNet(chainer.Chain):
             self.num_layers = num_layers
             self.stack_sizes = stack_sizes
             self.return_Ahat = return_Ahat
+            if retun_Ahat = True:
+                self.prediction_length = prediction_length
+            else:
+                self.prediction_length = 0
 
     def reset_state(self, batch_size, im_height, im_width):
         # Set initial states
@@ -229,7 +232,7 @@ class PredNet(chainer.Chain):
         e_t = [None]*self.num_layers
         r_t = [None]*self.num_layers
 
-        for t in range(T):
+        for t in range(T+self.prediction_length):
             if t == 0:
                 e_tm1 = e_init # E(t minus 1)
                 r_tm1 = r_init # R(t minus 1)
@@ -244,7 +247,10 @@ class PredNet(chainer.Chain):
             # Update Ahat, A, E states
             for l in range(self.num_layers):
                 if l == 0:
-                    e_t[l], frame_prediction = getattr(self, "E_block"+str(l))(x[:,t], r_t[l])
+                    if t < T:
+                        e_t[l], frame_prediction = getattr(self, "E_block"+str(l))(x[:,t], r_t[l])
+                    else:
+                        e_t[l], frame_prediction = getattr(self, "E_block"+str(l))(frame_prediction, r_t[l])    
                 else:
                     e_t[l] = getattr(self, "E_block"+str(l))(e_t[l-1], r_t[l])
 
