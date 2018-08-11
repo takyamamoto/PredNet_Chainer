@@ -25,13 +25,13 @@ python generate_result_images.py -g 0
 ```
 
 ### Testset 15th
-<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/out.gif" width=50%>
+<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/moving_mnist/results/out.gif" width=50%>
 
 ### Testset 20th
-<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/out2.gif" width=50%>
+<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/moving_mnist/results/out2.gif" width=50%>
 
 ### Loss
-<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/loss-30.png" width=70%>
+<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/moving_mnist/results/loss.png" width=70%>
 
 ## References
 - [Deep predictive coding networks for video prediction and unsupervised learning](https://arxiv.org/abs/1605.08104)
