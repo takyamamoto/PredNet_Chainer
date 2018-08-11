@@ -1,5 +1,5 @@
 # Deep Predictive Coding Network (PredNet) with Chainer
-Deep Predictive Coding Network (**PredNet**) implemented with Chainer
+Deep Predictive Coding Network (**PredNet**) implemented with Chainer v4
 
 ## Requirement
 - Python >=3.6
@@ -7,10 +7,9 @@ Deep Predictive Coding Network (**PredNet**) implemented with Chainer
 - matplotlib
 
 ## Usage
-Chainer model is defined with `network.py`
 
 ### Download Dataset
-From http://www.cs.toronto.edu/~nitish/unsupervised_video/, download **Moving MNIST**.
+Download avi file from [First-Person Social Interactions Dataset](http://ai.stanford.edu/~alireza/Disney/).
 
 ### Train
 When you use GPU, please run following command.
@@ -24,14 +23,8 @@ Run following command.
 python generate_result_images.py -g 0
 ```
 
-### Testset 15th
-<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/out.gif" width=50%>
-
-### Testset 20th
-<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/out2.gif" width=50%>
-
-### Loss
-<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/loss-30.png" width=70%>
+<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/out1.gif" width=70%>
+<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/out2.gif" width=70%>
 
 ## References
 - [Deep predictive coding networks for video prediction and unsupervised learning](https://arxiv.org/abs/1605.08104)
