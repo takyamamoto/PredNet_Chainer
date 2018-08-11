@@ -18,41 +18,51 @@ from chainer import cuda
 from chainer import Variable
 from chainer import serializers
 import chainer.functions as F
+import cv2
 
 import network
 
 xp = cuda.cupy
 
+def LoadData(image_dir="./Hussein_Day1_001/", num_frames=10, begin=0):    
+    for j in range(num_frames):
+        img = cv2.imread(image_dir+'frames_{0:06d}.jpg'.format(begin+j))
+        img = np.transpose(img, (2, 0, 1))
+        img = np.expand_dims(img, axis=0)
+        if j == 0:
+            stack = img
+        else:
+            stack = np.concatenate((stack, img), axis=0)
+    stack = np.expand_dims(stack, axis=0)
+    
+    data = stack.astype(np.float32)
+    data = data / 255
+    assert data.max() == 1, "Data is not in range 0 to 1."
+    
+    return data
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gpu', '-g', type=int, default=-1)
+    parser.add_argument('--gpu', '-g', type=int, default=0)
+    parser.add_argument('--dir', '-d', type=str, default="./Munehiko_Day1_003/")
     parser.add_argument('--model', '-m', type=str, default="./results/model")
     parser.add_argument('--begin', '-b', type=int, default=0)
     args = parser.parse_args()
 
     # Set up a neural network to train.
-    print("Load data...")
-    data = np.load("mnist_test_seq.npy")
-    data = np.hstack((data[:10], data[10:]))
-    data = data.transpose((1, 0, 2, 3))
-    data = np.reshape(data, (20000, 10, 1, 64, 64))
-    data = data / 255
-    data = data.astype(np.float32)
-
-    #train = data[:18000]
-    #validation = data[18000:19000]
-    test = data[19000:]
-    which = 20
-
+    print("Loading data")
+    num_frames = 10
+    test = LoadData(image_dir=args.dir, begin=args.begin, num_frames=num_frames)
+    x = test
+    
     # Set up a neural network to train.
-    print("Build model...")
-    model = network.PredNet(return_Ahat=True)
+    print("Building model")
+    prediction_length=5
+    model = network.PredNet(return_Ahat=True, prediction_length=prediction_length)
     if args.model != None:
         print( "Loading model from " + args.model )
         serializers.load_npz(args.model, model)
-
-    x = test[which]
-    x = np.expand_dims(x, 0)
 
     if args.gpu >= 0:
         cuda.get_device_from_id(0).use()
@@ -63,9 +73,11 @@ def main():
     print("Loss:", loss)
     print("len_outputs:", len(predicted))
 
-    x = test[which]
-    x = x * 255
+    x = test * 255
     x = x.astype(np.uint8)
+    x = np.reshape(x, (num_frames, 3, 120, 160))
+    x = np.transpose(x, (0, 2, 3, 1))
+    print(predicted[0].shape)
 
     #setup figure
     fig = plt.figure()
@@ -75,14 +87,21 @@ def main():
     ax2.set_title('Predicted')
 
     ims=[]
-    for time in range(10):
-        title = fig.text(0.5, 0.85, "t = "+str(time), fontsize="large")
-        im, = [ax1.imshow(x[time,0])]
+    for time in range(num_frames+prediction_length):
+        title = fig.text(0.5, 0.85, "t = "+str(time+1), fontsize="large")
+        if time < num_frames:
+            x_rgb = cv2.cvtColor(x[time], cv2.COLOR_BGR2RGB)
+            im, = [ax1.imshow(x_rgb)]
+        else:
+            im, = [ax1.imshow(np.zeros((120, 160, 3)))]
 
         p = cuda.to_cpu(predicted[time].data) #Variable to numpy
+        p = np.reshape(p, (3, 120, 160))
+        p = np.transpose(p, (1, 2, 0))
         p = p * 255
         p = p.astype(np.uint8)
-        im2, = [ax2.imshow(p[0,0])]
+        p = cv2.cvtColor(p, cv2.COLOR_BGR2RGB)
+        im2, = [ax2.imshow(p)]
         ims.append([im, im2, title])
 
     #run animation
@@ -92,29 +111,6 @@ def main():
     plt.show() #表示
     ani.save("results_video.mp4") #保存
 
-    """
-    #plt.savefig("result.png")
-    #plt.show()
-    #plt.close()
-    y_predict = model.predict(x_test)
-    y_subtraction = 1-np.abs(x_test - y_predict)
-    # Display the 1st 8 corrupted and denoised images
-    rows, cols = 1, 100
-    num = rows * cols
-    num_start = 5000
-    imgs = np.concatenate([x_test[num_start:num_start+num], y_test[num_start:num_start+num],
-                           y_predict[num_start:num_start+num], y_subtraction[num_start:num_start+num]])
-    imgs = imgs.reshape((rows * 4, cols, 64, 64))
-    imgs = np.vstack(np.split(imgs, rows, axis=1))
-    imgs = imgs.reshape((rows * 4, -1, 64, 64))
-    imgs = np.vstack([np.hstack(i) for i in imgs])
-    imgs = (imgs * 255).astype(np.uint8)
-    plt.figure()
-    plt.axis('off')
-    plt.imshow(imgs, interpolation='none', cmap='gray')
-    Image.fromarray(imgs).save('AE_result3.png')
-    plt.show()
-    """
 
 if __name__ == '__main__':
     main()

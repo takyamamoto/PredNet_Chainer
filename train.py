@@ -21,12 +21,12 @@ xp = cuda.cupy
 
 import network
 
-def LoadData(image_dir="./Denis_Day1_001/", num_frames=20, validation_rate=0.8):
+def LoadData(image_dir="./Denis_Day1_001/", num_frames=10, validation_rate=0.2):
     datalist = []
     num_files = len(glob.glob(image_dir+"*"))
     
     count = num_files//num_frames
-    num_train = int(count*validation_rate)
+    num_train = int(count*(1-validation_rate))
     
     for i in tqdm(range(count)):
         for j in range(num_frames):
@@ -46,12 +46,13 @@ def LoadData(image_dir="./Denis_Day1_001/", num_frames=20, validation_rate=0.8):
     
     data = data.astype(xp.float32)
     data = data / 255
-    print(data.max())
+    assert data.max() == 1, "Data is not in range 0 to 1."
+    
     return data[:num_train], data[num_train:]
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gpu', '-g', type=int, default=-1)
+    parser.add_argument('--gpu', '-g', type=int, default=0)
     parser.add_argument('--model', '-m', type=str, default=None)
     parser.add_argument('--opt', type=str, default=None)
     parser.add_argument('--epoch', '-e', type=int, default=60)
@@ -62,12 +63,40 @@ def main():
     args = parser.parse_args()
 
     print("Loading data")
+    
+    # Denis_Day1_001,Munehiko_Day1_003,Michael_Day2_003,Alin_Day1_001,
+    # Alin_Day1_002,Michael_Day2_002,Munehiko_Day1_002,Hussein_Day1_001
+    path = '*.avi'
+    file_list = glob.glob(path, recursive=True)
+    name_list = [f[:-4] for f in file_list]
+    train_list = []
+    val_list = []
+    N_train = 0
+    N_var = 0
+    num_frames = 20
+    for i in range(4):
+        print("Loading ", name_list[i])
+        t, v = LoadData(image_dir="./"+name_list[i]+"/", num_frames=num_frames, validation_rate=0.2)
+        train_list.append(t)
+        val_list.append(v)
+        N_train += t.shape[0]
+        N_var += v.shape[0]
 
-    train, validation = LoadData(image_dir="./Denis_Day1_001/")
+    train = np.zeros((N_train, num_frames, 3, 120, 160))
+    validation = np.zeros((N_var, num_frames, 3, 120, 160))
+    begin = 0
+    for i, t in enumerate(tqdm(train_list)):
+        train[begin:begin+t.shape[0]] = t
+        begin += t.shape[0]
+    
+    begin = 0
+    for i, v in enumerate(tqdm(val_list)):
+        validation[begin:begin+v.shape[0]] = v
+        begin += v.shape[0]
     #test = data[9500:]
 
     # Set up a neural network to train.
-    print("Build model...")
+    print("Building model")
     model = network.PredNet(stack_sizes=(3, 48, 96, 192))
 
     if args.gpu >= 0:

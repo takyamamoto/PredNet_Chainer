@@ -196,7 +196,7 @@ class PredNet(chainer.Chain):
             self.num_layers = num_layers
             self.stack_sizes = stack_sizes
             self.return_Ahat = return_Ahat
-            if retun_Ahat = True:
+            if return_Ahat == True:
                 self.prediction_length = prediction_length
             else:
                 self.prediction_length = 0
@@ -236,6 +236,7 @@ class PredNet(chainer.Chain):
             if t == 0:
                 e_tm1 = e_init # E(t minus 1)
                 r_tm1 = r_init # R(t minus 1)
+                ahat = None
 
             # Update R states
             for l in reversed(range(self.num_layers)):
@@ -250,16 +251,16 @@ class PredNet(chainer.Chain):
                     if t < T:
                         e_t[l], frame_prediction = getattr(self, "E_block"+str(l))(x[:,t], r_t[l])
                     else:
-                        e_t[l], frame_prediction = getattr(self, "E_block"+str(l))(frame_prediction, r_t[l])    
+                        e_t[l], frame_prediction = getattr(self, "E_block"+str(l))(ahat, r_t[l])    
                 else:
                     e_t[l] = getattr(self, "E_block"+str(l))(e_t[l-1], r_t[l])
 
             if self.return_Ahat == True:
+                ahat = frame_prediction
                 Ahat.append(frame_prediction)
 
             if t > 0:
-                #loss_t = (F.average(e1) + 0.1*F.average(e2) + 0.1*F.average(e3) + 0.1*F.average(e4) + 0.1*F.average(e5))/xs[0]
-                loss_t = (F.average(F.flatten(e_t[0])))/xs[0]
+                loss_t = F.average(e_t[0])
             else:
                 loss_t = 0
             loss = loss_t if loss is None else loss + loss_t
