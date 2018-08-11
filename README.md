@@ -2,9 +2,14 @@
 Deep Predictive Coding Network (**PredNet**) implemented with Chainer v4
 
 ## Requirement
+You must use a GPU to train.
 - Python >=3.6
 - Chainer 4.0
+- opencv-python
 - matplotlib
+- tqdm
+- glob
+- shutil
 
 ## Usage
 
