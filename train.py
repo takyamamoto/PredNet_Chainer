@@ -7,6 +7,8 @@ Created on Sat Jul 21 08:51:18 2018
 
 import argparse
 
+import os
+
 import numpy as np
 import cv2
 import glob
@@ -21,16 +23,16 @@ xp = cuda.cupy
 
 import network
 
-def LoadData(image_dir="./Denis_Day1_001/", num_frames=10, validation_rate=0.2):
+def LoadData(image_dir="./data/2806_resized/", num_frames=10, validation_rate=0.1):
     datalist = []
-    num_files = len(glob.glob(image_dir+"*"))
+    num_files = len(glob.glob(image_dir+"*.jpg"))
     
     count = num_files//num_frames
     num_train = int(count*(1-validation_rate))
-    
+
     for i in tqdm(range(count)):
         for j in range(num_frames):
-            img = cv2.imread(image_dir+'frames_{0:06d}.jpg'.format(i*num_frames+j))
+            img = cv2.imread(image_dir+'frame_{0:05d}.jpg'.format(1+i*num_frames+j))
             img = xp.transpose(img, (2, 0, 1))
             img = xp.expand_dims(img, axis=0)
             if j == 0:
@@ -40,7 +42,7 @@ def LoadData(image_dir="./Denis_Day1_001/", num_frames=10, validation_rate=0.2):
         stack = xp.expand_dims(stack, axis=0)
         datalist.append(stack)
     
-    data = np.zeros((count, num_frames, 3, 120, 160))
+    data = np.zeros((count, num_frames, 3, 144, 240))
     for i, partial_data in enumerate(tqdm(datalist)):
         data[i] = partial_data
     
@@ -63,36 +65,43 @@ def main():
     args = parser.parse_args()
 
     print("Loading data")
-    
-    # Denis_Day1_001,Munehiko_Day1_003,Michael_Day2_003,Alin_Day1_001,
-    # Alin_Day1_002,Michael_Day2_002,Munehiko_Day1_002,Hussein_Day1_001
-    path = '*.avi'
-    file_list = glob.glob(path, recursive=True)
-    name_list = [f[:-4] for f in file_list]
+    path = "./data"
+    files = os.listdir(path)
+    files_dir = [f for f in files if os.path.isdir(os.path.join(path, f))]
+    #files_dir.remove("2818_resized")
+
     train_list = []
     val_list = []
     N_train = 0
-    N_var = 0
+    N_val = 0
     num_frames = 20
-    for i in range(4):
-        print("Loading ", name_list[i])
-        t, v = LoadData(image_dir="./"+name_list[i]+"/", num_frames=num_frames, validation_rate=0.2)
+    for i in range(6):
+        print("Loading ", files_dir[i])
+        t, v = LoadData(image_dir=path+"/"+files_dir[i]+"/", num_frames=num_frames)
         train_list.append(t)
         val_list.append(v)
         N_train += t.shape[0]
-        N_var += v.shape[0]
-
-    train = np.zeros((N_train, num_frames, 3, 120, 160))
-    validation = np.zeros((N_var, num_frames, 3, 120, 160))
+        N_val += v.shape[0]
+        
+    train = np.zeros((N_train, num_frames, 3, 144, 240))
+    validation = np.zeros((N_val, num_frames, 3, 144, 240))
     begin = 0
     for i, t in enumerate(tqdm(train_list)):
         train[begin:begin+t.shape[0]] = t
         begin += t.shape[0]
-    
+        
     begin = 0
     for i, v in enumerate(tqdm(val_list)):
         validation[begin:begin+v.shape[0]] = v
         begin += v.shape[0]
+   
+    #validation = LoadData(image_dir=path+"/2818_resized/", num_frames=num_frames)
+
+    
+    #test = data[9500:]
+    print(train.shape)    
+    print(validation.shape)
+    
     #test = data[9500:]
 
     # Set up a neural network to train.
@@ -111,7 +120,6 @@ def main():
     train_iter = iterators.SerialIterator(train, batch_size=args.batch, shuffle=True)
     test_iter = iterators.SerialIterator(validation, batch_size=args.batch,
                                          repeat=False, shuffle=False)
-
     if args.model != None:
         print( "loading model from " + args.model)
         serializers.load_npz(args.model, model)

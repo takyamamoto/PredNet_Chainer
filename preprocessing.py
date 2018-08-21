@@ -11,38 +11,26 @@ import cv2
 from tqdm import tqdm
 import glob
 
-def Video2Frames(video_file ="Denis_Day1_001.avi", image_file='frames_%s.jpg',
-                 width = 160, height = 120):
-    
-    image_dir = "./"+video_file[:-4]+"/"
-    # Delete the entire directory tree if it exists.
-    if os.path.exists(image_dir):
-        shutil.rmtree(image_dir)
+def resize(image_dir="./2806/", out_dir="./data/", h=144, w=240):
+    if os.path.exists(out_dir):
+        shutil.rmtree(out_dir)
 
     # Make the directory if it doesn't exist.
-    if not os.path.exists(image_dir):
-        os.makedirs(image_dir)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
 
-    # Video to frames
-    i = 0
-    cap = cv2.VideoCapture(video_file)
-    num_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-    pbar = tqdm(total=num_frames)
-    while(cap.isOpened()):
-        flag, frame = cap.read()  # Capture frame-by-frame
-        if flag == False:  # Is a frame left?
-            break
-        frame = cv2.resize(frame, (width, height))
-        cv2.imwrite(image_dir+image_file % str(i).zfill(6), frame)  # Save a frame
-        i += 1
-        pbar.update(1)
-
-    cap.release()  # When everything done, release the capture
-    pbar.close()
+    files_list = glob.glob(image_dir+"*.jpg")
+    num_files = len(files_list)
+    for i in tqdm(range(num_files)):
+        #img = cv2.imread(files_list[i])
+        img = cv2.imread(image_dir+"frame_{0:05d}_detection.jpg".format(1+i))
+        img = cv2.resize(img, (w, h))
+        cv2.imwrite(out_dir+"frame_{0:05d}.jpg".format(1+i),img)
 
 if __name__ == '__main__':
-    path = '*.avi'
-    file_list = glob.glob(path, recursive=True)
-    for file in file_list:
-        print("Preprocessing ", file)
-        Video2Frames(video_file=file)
+    path = "./BikeVideoDataset"
+    files = os.listdir(path)
+    files_dir = [f for f in files if os.path.isdir(os.path.join(path, f))]
+    for i in range(len(files_dir)):
+        print("resize "+files_dir[i])
+        resize(image_dir=path+"/"+files_dir[i]+"/", out_dir="./data/"+files_dir[i]+"_resized/")
