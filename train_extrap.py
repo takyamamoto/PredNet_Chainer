@@ -8,8 +8,6 @@ Created on Sat Jul 21 08:51:18 2018
 import argparse
 
 import numpy as np
-import cv2
-import glob
 from tqdm import tqdm
 
 import chainer
@@ -19,50 +17,51 @@ from chainer import iterators, optimizers, serializers
 from chainer import cuda
 xp = cuda.cupy
 
-import network
+import network_extrap
 
 def LoadData(file_name, num_frames=10):
     datalist = []
-    
+
     all_file = np.load(file_name)
-    
+
     count = all_file.shape[0]//num_frames
-    #count = 10
     for i in tqdm(range(count)):
-        f = all_file[i*num_frames:(i+1)*num_frames]         
+        f = all_file[i*num_frames:(i+1)*num_frames]
         f = xp.transpose(f, (0, 3, 1, 2))
         datalist.append(f)
 
     data = np.zeros((count, num_frames, 3, 128, 160))
     for i, partial_data in enumerate(tqdm(datalist)):
         data[i] = partial_data
-    
+
     print(data.shape)
     data = data.astype(xp.float32)
     data = data / 255
     assert data.max() == 1, "Data is not in range 0 to 1."
-    
+
     return data
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', '-g', type=int, default=0)
-    parser.add_argument('--model', '-m', type=str, default=None)
+    parser.add_argument('--model', '-m', type=str, default="./results/model")
     parser.add_argument('--opt', type=str, default=None)
     parser.add_argument('--epoch', '-e', type=int, default=60)
     parser.add_argument('--lr', '-l', type=float, default=0.001)
-    parser.add_argument('--batch', '-b', type=int, default=8)
+    parser.add_argument('--batch', '-b', type=int, default=4)
     parser.add_argument('--noplot', dest='plot', action='store_false',
                         help='Disable PlotReport extension')
     args = parser.parse_args()
 
     print("Loading datas")
-    train = LoadData('X_train.npy')
-    validation = LoadData('X_val.npy')
-    
+    nt = 15
+    extrap_start_time = 10  
+    train = LoadData('X_train.npy', nt)
+    validation = LoadData('X_val.npy', nt)
+
     # Set up a neural network to train.
     print("Building model")
-    model = network.PredNet(stack_sizes=(3, 48, 96, 192))
+    model = network_extrap.PredNet(stack_sizes=(3, 48, 96, 192), extrap_start_time=extrap_start_time)
 
     if args.gpu >= 0:
         # Make a specified GPU current

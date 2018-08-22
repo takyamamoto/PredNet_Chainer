@@ -18,9 +18,8 @@ from chainer import cuda
 from chainer import Variable
 from chainer import serializers
 import chainer.functions as F
-import cv2
 
-import network
+import network_extrap
 
 xp = cuda.cupy
 
@@ -54,18 +53,18 @@ def main():
 
     # Set up a neural network to train.
     print("Loading data")
-    test = LoadData('X_test.npy')
-    which = 2
+    nt = 15
+    extrap_start_time = 10
+    test = LoadData('X_test.npy', nt)
+    which = 10
     x = test[which]
     x = np.expand_dims(x, 0)
 
     # Set up a neural network to train.
-    print("Building model")
-    num_frames = 10
-    prediction_length=5
-    model = network.PredNet(return_Ahat=True, prediction_length=prediction_length)
+    print("Building model")  
+    model = network_extrap.PredNet(return_Ahat=True, extrap_start_time=extrap_start_time)
     if args.model != None:
-        print( "Loading model from " + args.model )
+        print( "Loading model from " + args.model)
         serializers.load_npz(args.model, model)
 
     if args.gpu >= 0:
@@ -90,9 +89,9 @@ def main():
     ax2.set_title('Predicted')
 
     ims=[]
-    for time in range(num_frames+prediction_length):
+    for time in range(nt):
         title = fig.text(0.5, 0.85, "t = "+str(time+1), fontsize="large")
-        if time < num_frames:
+        if time < extrap_start_time:
             im, = [ax1.imshow(x[time])]
         else:
             im, = [ax1.imshow(np.zeros((128, 160, 3)))]

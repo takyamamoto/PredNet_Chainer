@@ -251,7 +251,7 @@ class PredNet(chainer.Chain):
                     if t < T:
                         e_t[l], frame_prediction = getattr(self, "E_block"+str(l))(x[:,t], r_t[l])
                     else:
-                        e_t[l], frame_prediction = getattr(self, "E_block"+str(l))(ahat, r_t[l])    
+                        e_t[l], frame_prediction = getattr(self, "E_block"+str(l))(ahat, r_t[l])
                 else:
                     e_t[l] = getattr(self, "E_block"+str(l))(e_t[l-1], r_t[l])
 
