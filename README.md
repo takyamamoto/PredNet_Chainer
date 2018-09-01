@@ -14,7 +14,7 @@ You must use a GPU to train.
 ## Usage
 
 ### Download Dataset
-Download preprocessed KITTI datasets from [prednet_kitti_data.zip](https://www.dropbox.com/s/rpwlnn6j39jjme4/kitti_data.zip?dl=0 -O $savedir/prednet_kitti_data.zip).  
+Download preprocessed KITTI datasets from [prednet_kitti_data.zip](https://www.dropbox.com/s/rpwlnn6j39jjme4/kitti_data.zip).  
 You have to convert hickle-python2 data to npy data.
 
 ### Train
