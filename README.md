@@ -1,5 +1,5 @@
 # Deep Predictive Coding Network (PredNet) with Chainer
-Deep Predictive Coding Network (**PredNet**) implemented with Chainer v4
+Deep Predictive Coding Network ([PredNet](https://github.com/coxlab/prednet)) implemented with Chainer v4
 
 ## Requirement
 You must use a GPU to train.
@@ -14,7 +14,8 @@ You must use a GPU to train.
 ## Usage
 
 ### Download Dataset
-Download avi file from [First-Person Social Interactions Dataset](http://ai.stanford.edu/~alireza/Disney/).
+Download preprocessed KITTI datasets from [prednet_kitti_data.zip](https://www.dropbox.com/s/rpwlnn6j39jjme4/kitti_data.zip?dl=0 -O $savedir/prednet_kitti_data.zip).  
+You have to convert hickle-python2 data to npy data.
 
 ### Train
 When you use GPU, please run following command.
@@ -22,14 +23,23 @@ When you use GPU, please run following command.
 python train.py -g 0
 ```
 
+When you want to train extrapolation model, run
+```
+python train_extrap.py -g 0
+```
+
 ## Results
 Run following command.
 ```
 python generate_result_images.py -g 0
 ```
+or
+```
+python generate_result_images_extrap.py -g 0
+```
 
-<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/out1.gif" width=70%>
-<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/out2.gif" width=70%>
+<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/output.gif" width=70%>
+<img src="https://github.com/takyamamoto/PredNet_Chainer/blob/master/results/output2.gif" width=70%>
 
 ## References
 - [Deep predictive coding networks for video prediction and unsupervised learning](https://arxiv.org/abs/1605.08104)

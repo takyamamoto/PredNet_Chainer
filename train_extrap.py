@@ -8,6 +8,8 @@ Created on Sat Jul 21 08:51:18 2018
 import argparse
 
 import numpy as np
+import cv2
+import glob
 from tqdm import tqdm
 
 import chainer
@@ -25,6 +27,7 @@ def LoadData(file_name, num_frames=10):
     all_file = np.load(file_name)
 
     count = all_file.shape[0]//num_frames
+    #count = 10
     for i in tqdm(range(count)):
         f = all_file[i*num_frames:(i+1)*num_frames]
         f = xp.transpose(f, (0, 3, 1, 2))
@@ -55,7 +58,7 @@ def main():
 
     print("Loading datas")
     nt = 15
-    extrap_start_time = 10  
+    extrap_start_time = 10  # starting at this time step, the prediction from the previous time step will be treated as the actual inp
     train = LoadData('X_train.npy', nt)
     validation = LoadData('X_val.npy', nt)
 
@@ -94,7 +97,7 @@ def main():
 
     # Snapshot
     trainer.extend(extensions.snapshot(), trigger=(10, 'epoch'))
-    #serializers.load_npz('./results/snapshot_iter_1407', trainer)
+    serializers.load_npz('./results/snapshot_iter_6898', trainer)
 
     # Decay learning rate
     points = [args.epoch*0.75]

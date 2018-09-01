@@ -56,7 +56,7 @@ def main():
     nt = 15
     extrap_start_time = 10
     test = LoadData('X_test.npy', nt)
-    which = 10
+    which = 0
     x = test[which]
     x = np.expand_dims(x, 0)
 
